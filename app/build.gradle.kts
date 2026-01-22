@@ -94,6 +94,41 @@ fun allCommitted(): Boolean {
     }
     return stringBuilder.toString().isEmpty()
 }
+val keyProps = Properties()
+val keyPropsFile: File = rootProject.file("keystore/keystore.properties")
+keyProps.load(FileInputStream(keyPropsFile))
+fun getStoreFile(): String {
+    var storeFile = keyProps["storeFile"].toString()
+    if (storeFile.isEmpty()) {
+        storeFile = System.getenv("storeFile") ?: ""
+    }
+    return storeFile
+}
+
+fun getStorePassword(): String {
+    var storePassword = keyProps["storePassword"].toString()
+    if (storePassword.isEmpty()) {
+        storePassword = System.getenv("storePassword") ?: ""
+    }
+    return storePassword
+}
+
+fun getKeyAlias(): String {
+    var keyAlias = keyProps["keyAlias"].toString()
+    if (keyAlias.isEmpty()) {
+        keyAlias = System.getenv("keyAlias") ?: ""
+    }
+    return keyAlias
+}
+
+fun getKeyPassword(): String {
+    var keyPassword = keyProps["keyPassword"].toString()
+    if (keyPassword.isEmpty()) {
+        keyPassword = System.getenv("keyPassword") ?: ""
+    }
+    return keyPassword
+}
+
 
 android {
 
