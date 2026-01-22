@@ -149,6 +149,22 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file(getStoreFile())
+            storePassword = getStorePassword()
+            keyAlias = getKeyAlias()
+            keyPassword = getKeyPassword()
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.findByName("release")
+        }
+
+    }
+
     useLibrary("org.apache.http.legacy")
 
     //Deleting it causes a binding error
