@@ -95,7 +95,7 @@ fun allCommitted(): Boolean {
     return stringBuilder.toString().isEmpty()
 }
 
-ef keyProps = new Properties()
+def keyProps = new Properties()
 def keyPropsFile = rootProject.file('keystore/keystore.properties')
 keyProps.load(new FileInputStream(keyPropsFile))
  
