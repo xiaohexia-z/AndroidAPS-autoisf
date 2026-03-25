@@ -95,6 +95,42 @@ fun allCommitted(): Boolean {
     return stringBuilder.toString().isEmpty()
 }
 
+ef keyProps = new Properties()
+def keyPropsFile = rootProject.file('keystore/keystore.properties')
+keyProps.load(new FileInputStream(keyPropsFile))
+ 
+def getStoreFile = {
+    def storeFile = keyProps['storeFile']
+    if (storeFile == null || storeFile.isEmpty()) {
+        storeFile = System.getenv("storeFile")
+    }
+    return storeFile
+}
+ 
+def getStorePassword = {
+    def storePassword = keyProps['storePassword']
+    if (storePassword == null || storePassword.isEmpty()) {
+        storePassword = System.getenv("storePassword")
+    }
+    return storePassword
+}
+ 
+def getKeyAlias = {
+    def keyAlias = keyProps['keyAlias']
+    if (keyAlias == null || keyAlias.isEmpty()) {
+        keyAlias = System.getenv("keyAlias")
+    }
+    return keyAlias
+}
+ 
+def getKeyPassword = {
+    def keyPassword = keyProps['keyPassword']
+    if (keyPassword == null || keyPassword.isEmpty()) {
+        keyPassword = System.getenv("keyPassword")
+    }
+    return keyPassword
+}
+
 android {
 
     namespace = "app.aaps"
