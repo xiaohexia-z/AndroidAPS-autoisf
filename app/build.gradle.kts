@@ -1,6 +1,8 @@
 import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Properties
+
 
 plugins {
     id("com.android.application")
@@ -95,41 +97,19 @@ fun allCommitted(): Boolean {
     return stringBuilder.toString().isEmpty()
 }
 
-def keyProps = new Properties()
-def keyPropsFile = rootProject.file('keystore/keystore.properties')
-keyProps.load(new FileInputStream(keyPropsFile))
- 
-def getStoreFile = {
-    def storeFile = keyProps['storeFile']
-    if (storeFile == null || storeFile.isEmpty()) {
-        storeFile = System.getenv("storeFile")
-    }
-    return storeFile
+
+// 1. 加载签名配置（优先读取本地 keystore.properties，无则读取 GitHub Secrets/环境变量）
+val keyProps = Properties()
+val keyPropsFile = rootProject.file("keystore/keystore.properties")
+if (keyPropsFile.exists()) {
+    keyProps.load(keyPropsFile.inputStream())
 }
- 
-def getStorePassword = {
-    def storePassword = keyProps['storePassword']
-    if (storePassword == null || storePassword.isEmpty()) {
-        storePassword = System.getenv("storePassword")
-    }
-    return storePassword
+
+// 2. 安全获取签名参数的辅助函数
+fun getProperty(name: String): String? {
+    return keyProps.getProperty(name) ?: System.getenv(name)
 }
- 
-def getKeyAlias = {
-    def keyAlias = keyProps['keyAlias']
-    if (keyAlias == null || keyAlias.isEmpty()) {
-        keyAlias = System.getenv("keyAlias")
-    }
-    return keyAlias
-}
- 
-def getKeyPassword = {
-    def keyPassword = keyProps['keyPassword']
-    if (keyPassword == null || keyPassword.isEmpty()) {
-        keyPassword = System.getenv("keyPassword")
-    }
-    return keyPassword
-}
+
 
 android {
 
@@ -186,20 +166,22 @@ android {
     }
 
 
-    signingConfigs {
-        release {
-            storeFile file(getStoreFile())
-            storePassword getStorePassword()
-            keyAlias getKeyAlias()
-            keyPassword getKeyPassword()
+   signingConfigs {
+        create("release") {
+            storeFile = getProperty("storeFile")?.let { file(it) }
+            storePassword = getProperty("storePassword")
+            keyAlias = getProperty("keyAlias")
+            keyPassword = getProperty("keyPassword")
         }
     }
 
     buildTypes {
-        release {
-            signingConfig signingConfigs.release
+        getByName("release") {
+            // 仅在签名配置齐全时应用签名
+            signingConfigs.findByName("release")?.let {
+                signingConfig = it
+            }
         }
-
     }
 
     useLibrary("org.apache.http.legacy")
