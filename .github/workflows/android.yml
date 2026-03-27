@@ -20,6 +20,22 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
+
+    - name:  Generate Keystore File
+      run: |
+          # 1. 确保 keystore 目录存在（不存在则创建）
+          mkdir -p keystore
+          
+          # 2. 将 Base64 编码的密钥库内容解码并写入文件
+          # 注意：请将下面文件名中的 *** 替换为你实际的文件名
+          echo "$KEY_STORE" | base64 -d > keystore/testkeystore.jks
+          
+          # 3. (可选) 验证文件是否生成成功
+          ls -la keystore/
+      env:
+          # 引用 GitHub Secrets 中存储的变量
+          KEY_STORE: ${{ secrets.KEYSTORE_FILE }}
+
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
     - name: Build with Gradle
