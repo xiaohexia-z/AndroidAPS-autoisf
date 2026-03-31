@@ -23,18 +23,23 @@ jobs:
 
     - name:  Generate Keystore File
       run: |
-          # 1. 确保 keystore 目录存在（不存在则创建）
-          mkdir -p keystore
-          
-          # 2. 将 Base64 编码的密钥库内容解码并写入文件
-          # 注意：请将下面文件名中的 *** 替换为你实际的文件名
-          echo "$KEY_STORE" | base64 -d > keystore/testkeystore.jks
-          
-          # 3. (可选) 验证文件是否生成成功
-          ls -la keystore/
+           # 1. 确保 keystore 目录存在（不存在则创建）
+           rm -rf ./keystore/testkeystore.jks
+           mkdir -p keystore
+           
+           # 1. 先把你的旧密钥库写出来
+           echo "$KEY_STORE" | base64 -d > keystore/old_keystore.jks
+        
+           # 👇 关键一步：直接在 CI 里把旧密钥库强制转成兼容格式！
+           keytool -importkeystore -srckeystore keystore/old_keystore.jks -destkeystore keystore/testkeystore.jks -deststoretype pkcs12 -srcstorepass "$KEY_STORE_PASSWORD" -deststorepass "$KEY_STORE_PASSWORD" -srcalias "$KEY_ALIAS" -destalias "$KEY_ALIAS" -srckeypass "$KEY_PASSWORD" -destkeypass "$KEY_PASSWORD" -noprompt
+        
+           # 验证一下
+           ls -la keystore/
       env:
-          # 引用 GitHub Secrets 中存储的变量
-          KEY_STORE: ${{ secrets.KEYSTORE_FILE }}
+        KEY_STORE: ${{ secrets.KEYSTORE_FILE }}
+        KEY_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}  # 你需要在 GitHub Secrets 里加这个
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}                      # 你需要在 GitHub Secrets 里加这个
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}                # 你需要在 GitHub Secrets 里加这个
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
