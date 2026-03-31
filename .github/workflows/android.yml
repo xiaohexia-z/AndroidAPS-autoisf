@@ -37,7 +37,7 @@ jobs:
            ls -la keystore/
       env:
         KEY_STORE: ${{ secrets.KEY_STORE }}
-        KEY_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}  # 你需要在 GitHub Secrets 里加这个
+        KEY_STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}  # 你需要在 GitHub Secrets 里加这个
         KEY_ALIAS: ${{ secrets.KEY_ALIAS }}                      # 你需要在 GitHub Secrets 里加这个
         KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}                # 你需要在 GitHub Secrets 里加这个
 
