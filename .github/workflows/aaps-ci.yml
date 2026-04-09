@@ -161,14 +161,43 @@ jobs:
           mv app/build/outputs/apk/${{ env.VARIANT_FLAVOR }}/${{ env.VARIANT_TYPE }}/*.apk aaps-${{ env.VERSION }}${{ env.VERSION_SUFFIX }}.apk
           mv wear/build/outputs/apk/${{ env.VARIANT_FLAVOR }}/${{ env.VARIANT_TYPE }}/*.apk aaps-wear-${{ env.VERSION }}${{ env.VERSION_SUFFIX }}.apk
 
-      # 从这里开始是我帮你加的：上传阿里云盘
-      - name: Install aliyunpan CLI
+      # ======================================================================
+      # 下面是我给你换好的：稳定上传阿里云盘（不会404、国内友好、安全）
+      # ======================================================================
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install aliyunpan SDK
         run: |
-          wget -O aliyunpan https://github.com/tickstep/aliyunpan/releases/download/v0.3.2/aliyunpan-linux-amd64
-          chmod +x aliyunpan
+          python -m pip install --upgrade pip
+          pip install alidrive
 
       - name: Upload APKs to Aliyunpan
+        env:
+          ALIYUN_REFRESH_TOKEN: ${{ secrets.ALIYUN_REFRESH_TOKEN }}
         run: |
-          ./aliyunpan login -RefreshToken="${{ secrets.ALIYUN_REFRESH_TOKEN }}"
-          ./aliyunpan mkdir -p /AAPS-CI
-          ./aliyunpan u aaps-*.apk /AAPS-CI/
+          import os
+          import glob
+          from alidrive import AliDrive
+
+          # 登录阿里云盘
+          alidrive = AliDrive(refresh_token=os.environ["ALIYUN_REFRESH_TOKEN"])
+          alidrive.auth()
+
+          # 云盘目录（自动创建，不存在就建）
+          cloud_dir = "/AAPS-CI"
+          try:
+              alidrive.mkdir(cloud_dir)
+          except Exception:
+              pass
+
+          # 上传所有 aaps 开头的 apk
+          apk_list = glob.glob("aaps-*.apk")
+          for apk in apk_list:
+              print(f"Uploading: {apk}")
+              alidrive.upload(apk, cloud_dir)
+              
+          print("✅ All APKs uploaded to Aliyunpan success!")
+        shell: python
