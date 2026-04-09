@@ -28,25 +28,15 @@ jobs:
           if [ -n "${{ secrets.KEYSTORE_SET }}" ]; then
             echo "🔐 Decoding KEYSTORE_SET..."
             DECODED=$(echo "${{ secrets.KEYSTORE_SET }}" | base64 -d)
-
             KEYSTORE_BASE64=$(echo "$DECODED" | cut -d'|' -f1)
             KEYSTORE_PASSWORD=$(echo "$DECODED" | cut -d'|' -f2)
             KEY_ALIAS=$(echo "$DECODED" | cut -d'|' -f3)
             KEY_PASSWORD=$(echo "$DECODED" | cut -d'|' -f4)
-
             echo "KEYSTORE_BASE64=$KEYSTORE_BASE64" >> $GITHUB_ENV
             echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> $GITHUB_ENV
             echo "KEY_ALIAS=$KEY_ALIAS" >> $GITHUB_ENV
             echo "KEY_PASSWORD=$KEY_PASSWORD" >> $GITHUB_ENV
-
-            echo "::add-mask::$KEYSTORE_BASE64"
-            echo "::add-mask::$KEYSTORE_PASSWORD"
-            echo "::add-mask::$KEY_ALIAS"
-            echo "::add-mask::$KEY_PASSWORD"
-
-            echo "✅ Keystore parameters extracted from KEYSTORE_SET"
           else
-            echo "ℹ️ KEYSTORE_SET not provided, using separate secrets."
             echo "KEYSTORE_BASE64=${{ secrets.KEYSTORE_BASE64 }}" >> $GITHUB_ENV
             echo "KEYSTORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
             echo "KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> $GITHUB_ENV
@@ -57,53 +47,27 @@ jobs:
         run: |
           echo "🔍 Checking required secrets..."
           MISSING=0
-
           check_secret() {
-            if [ -z "$1" ]; then
-              echo "❌ Missing secret: $2"
-              MISSING=1
-            fi
+            if [ -z "$1" ]; then echo "❌ Missing secret: $2"; MISSING=1; fi
           }
-          
           check_secret "$KEYSTORE_BASE64" "KEYSTORE_BASE64"
           check_secret "$KEYSTORE_PASSWORD" "KEYSTORE_PASSWORD"
           check_secret "$KEY_ALIAS" "KEY_ALIAS"
           check_secret "$KEY_PASSWORD" "KEY_PASSWORD"
-
-          if [ "$MISSING" -eq 1 ]; then
-            echo "🛑 Missing required secrets. Stopping build."
-            exit 1
-          fi
-
-          echo "✅ All required secrets are present."
+          if [ "$MISSING" -eq 1 ]; then exit 1; fi
 
       - name: Decode keystore file
         run: |
           mkdir -p "$RUNNER_TEMP/keystore"
           echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/keystore/keystore.jks"
 
-      - name: Validating keystore, alias and password
+      - name: Validating keystore
         run: |
-          set -x
-          echo "🔐 Validating keystore, alias and password"
-
           echo "test" > dummy.txt
           zip -q dummy.jar dummy.txt
           rm dummy.txt
-          
-          JARSIGNER_LOG=$(mktemp)
-          if ! jarsigner \
-              -keystore "$RUNNER_TEMP/keystore/keystore.jks" \
-              -storepass "$KEYSTORE_PASSWORD" \
-              -keypass "$KEY_PASSWORD" \
-              dummy.jar "$KEY_ALIAS" > "$JARSIGNER_LOG" 2>&1; then
-            echo "❌ Either KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_PASSWORD, or KEY_ALIAS is incorrect"
-            cat "$JARSIGNER_LOG"
-            rm -f "$JARSIGNER_LOG" dummy.jar
-            exit 1
-          fi
-          rm -f "$JARSIGNER_LOG" dummy.jar
-          echo "✅ Keystore, alias, and key password are valid."
+          jarsigner -keystore "$RUNNER_TEMP/keystore/keystore.jks" -storepass "$KEYSTORE_PASSWORD" -keypass "$KEY_PASSWORD" dummy.jar "$KEY_ALIAS"
+          rm dummy.jar
 
       - name: Checkout source code
         uses: actions/checkout@v4
@@ -132,7 +96,7 @@ jobs:
           fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-      - name: Set up JDK
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: 21
@@ -156,48 +120,24 @@ jobs:
               -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
               -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
 
-      - name: Rename APKs with version
+      - name: Rename APKs
         run: |
           mv app/build/outputs/apk/${{ env.VARIANT_FLAVOR }}/${{ env.VARIANT_TYPE }}/*.apk aaps-${{ env.VERSION }}${{ env.VERSION_SUFFIX }}.apk
           mv wear/build/outputs/apk/${{ env.VARIANT_FLAVOR }}/${{ env.VARIANT_TYPE }}/*.apk aaps-wear-${{ env.VERSION }}${{ env.VERSION_SUFFIX }}.apk
 
       # ======================================================================
-      # 下面是我给你换好的：稳定上传阿里云盘（不会404、国内友好、安全）
+      # 你要的正确版本：v0.3.8 zip 解压上传
       # ======================================================================
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install aliyunpan SDK
+      - name: Get aliyunpan v0.3.8
         run: |
-          python -m pip install --upgrade pip
-          pip install alidrive
+          wget https://github.com/tickstep/aliyunpan/releases/download/v0.3.8/aliyunpan-v0.3.8-linux-amd64.zip
+          unzip aliyunpan-v0.3.8-linux-amd64.zip
+          cd aliyunpan-v0.3.8-linux-amd64
+          chmod +x aliyunpan
 
       - name: Upload APKs to Aliyunpan
-        env:
-          ALIYUN_REFRESH_TOKEN: ${{ secrets.ALIYUN_REFRESH_TOKEN }}
         run: |
-          import os
-          import glob
-          from alidrive import AliDrive
-
-          # 登录阿里云盘
-          alidrive = AliDrive(refresh_token=os.environ["ALIYUN_REFRESH_TOKEN"])
-          alidrive.auth()
-
-          # 云盘目录（自动创建，不存在就建）
-          cloud_dir = "/AAPS-CI"
-          try:
-              alidrive.mkdir(cloud_dir)
-          except Exception:
-              pass
-
-          # 上传所有 aaps 开头的 apk
-          apk_list = glob.glob("aaps-*.apk")
-          for apk in apk_list:
-              print(f"Uploading: {apk}")
-              alidrive.upload(apk, cloud_dir)
-              
-          print("✅ All APKs uploaded to Aliyunpan success!")
-        shell: python
+          cd aliyunpan-v0.3.8-linux-amd64
+          ./aliyunpan login -RefreshToken="${{ secrets.ALIYUN_REFRESH_TOKEN }}"
+          ./aliyunpan mkdir -p /AAPS-CI
+          ./aliyunpan upload ../aaps-*.apk /AAPS-CI/
