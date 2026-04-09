@@ -87,12 +87,10 @@ jobs:
           set -x
           echo "🔐 Validating keystore, alias and password"
 
-          # Create a dummy JAR file (quick method using zip)
           echo "test" > dummy.txt
           zip -q dummy.jar dummy.txt
           rm dummy.txt
           
-          # Attempt to validate using jarsigner
           JARSIGNER_LOG=$(mktemp)
           if ! jarsigner \
               -keystore "$RUNNER_TEMP/keystore/keystore.jks" \
@@ -100,16 +98,12 @@ jobs:
               -keypass "$KEY_PASSWORD" \
               dummy.jar "$KEY_ALIAS" > "$JARSIGNER_LOG" 2>&1; then
             echo "❌ Either KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_PASSWORD, or KEY_ALIAS is incorrect"
-            echo "🔍 jarsigner error output:"
             cat "$JARSIGNER_LOG"
             rm -f "$JARSIGNER_LOG" dummy.jar
             exit 1
           fi
           rm -f "$JARSIGNER_LOG" dummy.jar
           echo "✅ Keystore, alias, and key password are valid."
-
-          rm -f "$KEYTOOL_LOG"
-          echo "✅ Keystore and credentials validated."
 
       - name: Checkout source code
         uses: actions/checkout@v4
@@ -141,7 +135,6 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
-          # When upgrading the JDK, please update this section accordingly as well.
           java-version: 21
           distribution: 'temurin'
           cache: gradle
@@ -168,11 +161,14 @@ jobs:
           mv app/build/outputs/apk/${{ env.VARIANT_FLAVOR }}/${{ env.VARIANT_TYPE }}/*.apk aaps-${{ env.VERSION }}${{ env.VERSION_SUFFIX }}.apk
           mv wear/build/outputs/apk/${{ env.VARIANT_FLAVOR }}/${{ env.VARIANT_TYPE }}/*.apk aaps-wear-${{ env.VERSION }}${{ env.VERSION_SUFFIX }}.apk
 
-      - name: Upload APK to GitHub Actions
-        uses: actions/upload-artifact@v4
-        with:
-          name: AAPS-${{ env.VERSION }}${{ env.VERSION_SUFFIX }}
-          path: |
-            aaps-${{ env.VERSION }}${{ env.VERSION_SUFFIX }}.apk
-            aaps-wear-${{ env.VERSION }}${{ env.VERSION_SUFFIX }}.apk
-          if-no-files-found: error
+      # 从这里开始是我帮你加的：上传阿里云盘
+      - name: Install aliyunpan CLI
+        run: |
+          wget -O aliyunpan https://github.com/tickstep/aliyunpan/releases/download/v0.3.2/aliyunpan-linux-amd64
+          chmod +x aliyunpan
+
+      - name: Upload APKs to Aliyunpan
+        run: |
+          ./aliyunpan login -RefreshToken="${{ secrets.ALIYUN_REFRESH_TOKEN }}"
+          ./aliyunpan mkdir -p /AAPS-CI
+          ./aliyunpan u aaps-*.apk /AAPS-CI/
